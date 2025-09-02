@@ -8,7 +8,7 @@ use crate::{
     context::Context,
     handler::Handler,
     http::{Request, response::Response},
-    route::Route,
+    route::RouteNode,
 };
 
 fn not_found(_: Request, _: Context) -> Response {
@@ -24,7 +24,7 @@ pub enum ServerError {
 
 pub struct Server {
     addr: SocketAddr,
-    routes: Route,
+    root: RouteNode,
 }
 
 impl Server {
@@ -49,7 +49,7 @@ impl Server {
 
         let context = Context::default();
 
-        let response = match self.routes.search(&request.uri.path) {
+        let response = match self.root.search(&request.uri.path) {
             Some(handler) => (handler)(request, context),
             None => not_found(request, context),
         };
@@ -57,18 +57,8 @@ impl Server {
         Ok(response)
     }
 
-    pub fn add_handler(&mut self, route: &str, handler: Handler) {
-        if route == "/" {
-            match &mut self.routes {
-                Route::RootNode {
-                    children: _,
-                    handler: h,
-                } => {
-                    *h = Some(handler);
-                }
-                _ => return, // Invalid state
-            }
-        }
+    pub fn add_handler(&mut self, path: &str, handler: Handler) {
+        self.root.add_handler(path, handler);
     }
 
     pub fn run(&self) -> Result<(), ServerError> {
@@ -118,7 +108,7 @@ impl Default for Server {
     fn default() -> Self {
         Self {
             addr: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 8888)),
-            routes: Route::default(),
+            root: RouteNode::default(),
         }
     }
 }
